@@ -70,7 +70,7 @@ function formatRequestHeaders (config: any) {
     delete headers['Content-Type']
   }
 
-  if (endpoint && endpoint.requestFormat === 'json' && headers['Content-Type']?.includes('application/x-www-form-urlencoded')) {
+  if (headers['Content-Type']?.includes('application/x-www-form-urlencoded') && endpoint && (!endpoint.requestFormat || endpoint.requestFormat === 'json')) {
     delete headers['Content-Type']
   }
 
