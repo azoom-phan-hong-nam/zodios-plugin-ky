@@ -1,12 +1,18 @@
 import ky from 'ky-universal'
 import { AxiosError } from 'axios'
+import { match } from 'path-to-regexp'
 import { KyPluginOptions, KyZodiosPlugin} from '../index'
 
 export function KyPlugin (options?: KyPluginOptions): KyZodiosPlugin {
   return {
     name: 'ky',
     request: async (api, config) => {
-      const endpoint = api.find(endpoint => endpoint.path.replace(/^\//, '') === config.url.replace(/^\//, '') && endpoint.method === config.method)
+      const endpoint = api.find(endpoint => {
+        const urlMatchFn = match(endpoint.path)
+        const checkUrl = `/${config.url.replace(/^\//, '')}`
+
+        return urlMatchFn(checkUrl) && endpoint.method === config.method
+      })
 
       return {
         transformRequest: [(data: any) => data],
