@@ -1,9 +1,11 @@
 import ky from 'ky-universal'
 import { AxiosError } from 'axios'
 import { match } from 'path-to-regexp'
-import { KyPluginOptions, KyZodiosPlugin} from '../index'
+import { KyPluginOptions, KyZodiosPlugin } from '../index'
+import { KY_REQUEST_EXTEND_OPTIONS } from './constants'
+import { pick } from './utils'
 
-export function KyPlugin (options?: KyPluginOptions): KyZodiosPlugin {
+export function KyPlugin(options?: KyPluginOptions): KyZodiosPlugin {
   return {
     name: 'ky',
     request: async (api, config) => {
@@ -25,14 +27,14 @@ export function KyPlugin (options?: KyPluginOptions): KyZodiosPlugin {
   }
 }
 
-export async function kyAdapter (config: any): Promise<any> {
+export async function kyAdapter(config: any): Promise<any> {
   const { kyInstance, url, kyConfig } = prepareKyRequest(config)
   try {
     const response = await kyInstance(url, kyConfig)
     return formatResponse(config, response)
   } catch (error: any) {
-    const headers: { [index: string]: any} = {}
-    error.response?.headers.forEach((value:string, name:string) => {
+    const headers: { [index: string]: any } = {}
+    error.response?.headers.forEach((value: string, name: string) => {
       headers[name.toLowerCase()] = value
     })
 
@@ -53,7 +55,7 @@ export async function kyAdapter (config: any): Promise<any> {
   }
 }
 
-function prepareKyRequest (config: any) {
+function prepareKyRequest(config: any) {
   return {
     kyConfig: prepareKyRequestConfig(config),
     kyInstance: config.kyInstance || ky.create({}),
@@ -61,16 +63,31 @@ function prepareKyRequest (config: any) {
   }
 }
 
-function prepareKyRequestConfig (config: any) {
+function normalizeKyConfig(config: any) {
+  const normalizedKyConfig = { ...config }
+  const { timeout } = normalizedKyConfig
+
+  if (timeout === 0) { // Ky timeout = false or number > 0
+    delete normalizedKyConfig.timeout
+  }
+
+  return normalizedKyConfig
+}
+
+function prepareKyRequestConfig(config: any) {
+  const headers = formatRequestHeaders(config)
+  const payload = formatRequestPayload(config)
+  const kyConfigs = pick(config, KY_REQUEST_EXTEND_OPTIONS)
+  const normalizedKyConfig = normalizeKyConfig(kyConfigs)
+
   return {
-    method: config.method,
-    searchParams: config.searchParams,
-    headers: formatRequestHeaders(config),
-    ...formatRequestPayload(config)
+    ...normalizedKyConfig,
+    ...payload,
+    headers,
   }
 }
 
-function formatRequestHeaders (config: any) {
+function formatRequestHeaders(config: any) {
   const { endpoint, headers, data } = config
   if (endpoint && endpoint.requestFormat !== 'json') {
     delete headers['Content-Type']
@@ -87,7 +104,7 @@ function formatRequestHeaders (config: any) {
   return headers
 }
 
-function formatRequestPayload (config: any) {
+function formatRequestPayload(config: any) {
   const { data } = config
 
   if (isFormData(data) || isBlob(data) || isFile(data) || isSearchParams(data)) {
@@ -97,9 +114,9 @@ function formatRequestPayload (config: any) {
   return { json: data }
 }
 
-function formatResponse (config: any, response: Response) {
-  const headers: { [index: string]: any} = {}
-  response.headers.forEach((value:string, name:string) => {
+function formatResponse(config: any, response: Response) {
+  const headers: { [index: string]: any } = {}
+  response.headers.forEach((value: string, name: string) => {
     headers[name.toLowerCase()] = value
   })
   return {
@@ -111,23 +128,23 @@ function formatResponse (config: any, response: Response) {
   }
 }
 
-function isFormData (data:any) {
+function isFormData(data: any) {
   return isKindOf('FormData')(data)
 }
 
-function isBlob (data:any) {
+function isBlob(data: any) {
   return isKindOf('Blob')(data)
 }
 
-function isFile (data:any) {
+function isFile(data: any) {
   return isKindOf('File')(data)
 }
 
-function isSearchParams (data:any) {
+function isSearchParams(data: any) {
   return isKindOf('URLSearchParams')(data)
 }
 
-function isKindOf (kind:string) {
+function isKindOf(kind: string) {
   return (data: any): boolean => {
     const pattern = `[object ${kind}]`
     return data && (toString.call(data) === pattern ||
